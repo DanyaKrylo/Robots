@@ -1,11 +1,8 @@
 package gui;
 
-import java.awt.Dimension;
-import java.awt.Toolkit;
-import java.awt.event.KeyEvent;
-import java.awt.event.WindowAdapter;
-import java.awt.event.WindowEvent;
-import java.util.Locale;
+import java.awt.*;
+import java.awt.event.*;
+import java.util.*;
 import javax.swing.*;
 import log.Logger;
 
@@ -14,8 +11,10 @@ public class MainApplicationFrame extends JFrame implements LocaleChangeListener
     private LogWindow logWindow;
     private GameWindow gameWindow;
 
+    // Карта для быстрого доступа к окнам по их типу
+    private final Map<String, JInternalFrame> windowMap = new HashMap<>();
+
     public MainApplicationFrame() {
-        // Регистрируемся в LocaleManager
         LocaleManager.getInstance().addListener(this);
 
         int inset = 50;
@@ -25,16 +24,16 @@ public class MainApplicationFrame extends JFrame implements LocaleChangeListener
                 screenSize.height - inset * 2);
         setContentPane(desktopPane);
 
-        // Создаём окна Лога и Игры с локализованными заголовками
         logWindow = createLogWindow();
         addWindow(logWindow);
+        windowMap.put("log", logWindow);
 
         gameWindow = createGameWindow();
         addWindow(gameWindow);
+        windowMap.put("game", gameWindow);
 
         setJMenuBar(generateMenuBar());
 
-        // Обработка закрытия главного окна с подтверждением
         setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
         addWindowListener(new WindowAdapter() {
             @Override
@@ -69,9 +68,9 @@ public class MainApplicationFrame extends JFrame implements LocaleChangeListener
     private JMenuBar generateMenuBar() {
         JMenuBar menuBar = new JMenuBar();
         menuBar.add(createLookAndFeelMenu());
-        menuBar.add(createLanguageMenu());   // новое меню выбора языка
+        menuBar.add(createLanguageMenu());
         menuBar.add(createTestMenu());
-        menuBar.add(createExitMenu());        // меню "Выйти"
+        menuBar.add(createExitMenu());
         return menuBar;
     }
 
@@ -131,19 +130,74 @@ public class MainApplicationFrame extends JFrame implements LocaleChangeListener
         return menu;
     }
 
-    // ---------- Подтверждение выхода с использованием CloseDialogHelper ----------
+    // ---------- Профилирование ----------
+    /**
+     * Собирает текущее состояние приложения.
+     */
+    public Profile captureProfile() {
+        Locale locale = LocaleManager.getInstance().getCurrentLocale();
+        Rectangle mainBounds = getBounds();
+        int mainState = getExtendedState();
+
+        java.util.List<WindowState> windows = new ArrayList<>();
+        for (JInternalFrame frame : windowMap.values()) {
+            if (frame == null) continue;
+            String type = frame instanceof LogWindow ? "log" : "game";
+            windows.add(new WindowState(
+                    type,
+                    frame.getBounds(),
+                    frame.isIcon(),
+                    frame.isClosed()
+            ));
+        }
+        return new Profile(locale, mainBounds, mainState, windows);
+    }
+
+    /**
+     * Восстанавливает состояние приложения из профиля.
+     */
+    public void applyProfile(Profile profile) {
+        // Главное окно
+        Rectangle mainBounds = profile.getMainFrameBounds();
+        if (mainBounds != null) {
+            setBounds(mainBounds);
+        }
+        setExtendedState(profile.getMainFrameExtendedState());
+
+        // Внутренние окна
+        java.util.List<WindowState> winStates = profile.getInternalWindows();
+        if (winStates != null) {
+            for (WindowState ws : winStates) {
+                JInternalFrame frame = windowMap.get(ws.getType());
+                if (frame != null) {
+                    frame.setBounds(ws.getBounds());
+                    try {
+                        frame.setIcon(ws.isIcon());
+                    } catch (Exception e) { /* игнорируем, если не поддерживается */ }
+                    if (ws.isClosed()) {
+                        frame.dispose();
+                        windowMap.remove(ws.getType());
+                    }
+                }
+            }
+        }
+        revalidate();
+        repaint();
+    }
+
+    // ---------- Выход с сохранением ----------
     private void confirmExit() {
         if (CloseDialogHelper.confirmClose(this, "confirm.exit", "confirm.title")) {
+            ProfileManager.saveProfile(captureProfile()); // сохранение профиля
             System.exit(0);
         }
     }
 
-    // ---------- Локализованная строка ----------
+    // ---------- Вспомогательные методы ----------
     private String getMessage(String key) {
         return LocaleManager.getInstance().getString(key);
     }
 
-    // ---------- Смена темы оформления ----------
     private void setLookAndFeel(String className) {
         try {
             UIManager.setLookAndFeel(className);
@@ -153,15 +207,11 @@ public class MainApplicationFrame extends JFrame implements LocaleChangeListener
         }
     }
 
-    // ---------- Обновление интерфейса при смене языка ----------
     @Override
     public void onLocaleChanged() {
-        // Пересоздаём меню с новыми строками
         setJMenuBar(generateMenuBar());
-        // Обновляем заголовки внутренних окон
         if (logWindow != null) logWindow.updateTitle();
         if (gameWindow != null) gameWindow.updateTitle();
-        // Перерисовываем
         revalidate();
         repaint();
     }

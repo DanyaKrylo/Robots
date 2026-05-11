@@ -1,15 +1,7 @@
 package gui;
 
-import java.util.Locale;
-import java.util.ResourceBundle;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 
-/**
- * Менеджер локализации.
- * Хранит текущую локаль и ResourceBundle.
- * Позволяет менять язык и уведомлять подписанные компоненты.
- */
 public class LocaleManager {
     private static LocaleManager instance;
     private Locale currentLocale;
@@ -17,7 +9,6 @@ public class LocaleManager {
     private final List<LocaleChangeListener> listeners = new ArrayList<>();
 
     private LocaleManager() {
-        // По умолчанию – локаль системы
         currentLocale = Locale.getDefault();
         loadBundle();
     }
@@ -39,6 +30,10 @@ public class LocaleManager {
         notifyListeners();
     }
 
+    public Locale getCurrentLocale() {
+        return currentLocale;
+    }
+
     private void loadBundle() {
         bundle = ResourceBundle.getBundle("messages", currentLocale);
     }
@@ -56,8 +51,4 @@ public class LocaleManager {
             l.onLocaleChanged();
         }
     }
-}
-
-interface LocaleChangeListener {
-    void onLocaleChanged();
 }
