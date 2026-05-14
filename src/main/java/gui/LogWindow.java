@@ -4,8 +4,6 @@ import java.awt.BorderLayout;
 import java.awt.EventQueue;
 import java.awt.TextArea;
 import javax.swing.*;
-import javax.swing.event.InternalFrameAdapter;
-import javax.swing.event.InternalFrameEvent;
 import log.LogChangeListener;
 import log.LogEntry;
 import log.LogWindowSource;
@@ -19,7 +17,7 @@ public class LogWindow extends JInternalFrame implements LogChangeListener, Loca
               true, true, true, true);
         m_logSource = logSource;
         m_logSource.registerListener(this);
-        LocaleManager.getInstance().addListener(this); // подписываемся на смену языка
+        LocaleManager.getInstance().addListener(this);
 
         m_logContent = new TextArea("");
         m_logContent.setSize(200, 500);
@@ -30,22 +28,10 @@ public class LogWindow extends JInternalFrame implements LogChangeListener, Loca
         pack();
         updateLogContent();
 
-        // Подтверждение закрытия окна (исправлено: используем CloseDialogHelper)
-        addInternalFrameListener(new InternalFrameAdapter() {
-            @Override
-            public void internalFrameClosing(InternalFrameEvent e) {
-                if (CloseDialogHelper.confirmClose(LogWindow.this, "confirm.close", "confirm.title")) {
-                    unregisterListeners();
-                    setDefaultCloseOperation(DISPOSE_ON_CLOSE);
-                    dispose(); // явно закрываем
-                } else {
-                    setDefaultCloseOperation(DO_NOTHING_ON_CLOSE);
-                }
-            }
-        });
+        // Убираем дублирование, используя новый хелпер
+        CloseDialogHelper.installCloseListener(this, "confirm.close", "confirm.title", this::unregisterListeners);
     }
 
-    // Отписываемся от лога и менеджера локализации
     private void unregisterListeners() {
         m_logSource.unregisterListener(this);
         LocaleManager.getInstance().removeListener(this);

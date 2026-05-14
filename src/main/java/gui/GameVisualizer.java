@@ -32,7 +32,7 @@ public class GameVisualizer extends JPanel {
 
     public GameVisualizer() {
         m_timer.schedule(new TimerTask() {
-            @Override
+           @Override
             public void run() {
                 onRedrawEvent();
             }
@@ -43,10 +43,10 @@ public class GameVisualizer extends JPanel {
                 onModelUpdateEvent();
             }
         }, 0, 10);
-        addMouseListener(new MouseAdapter() {
+        addMouseListener(new MouseAdapter() { // Добавлен слушатель событий мыши
             @Override
-            public void mouseClicked(MouseEvent e) {
-                setTargetPosition(e.getPoint());
+            public void mouseClicked(MouseEvent e) { // При каждом клике программа берет координаты курсора
+                setTargetPosition(e.getPoint()); // из события e.getPoint
                 repaint();
             }
         });
@@ -84,9 +84,7 @@ public class GameVisualizer extends JPanel {
         double velocity = maxVelocity;
         double angleToTarget = angleTo(m_robotPositionX, m_robotPositionY, m_targetPositionX, m_targetPositionY);
 
-        // Вычисление кратчайшей угловой ошибки
         double angleDiff = angleToTarget - m_robotDirection;
-        // Нормализуем в диапазон (-PI, PI]
         while (angleDiff > Math.PI) angleDiff -= 2 * Math.PI;
         while (angleDiff <= -Math.PI) angleDiff += 2 * Math.PI;
 
@@ -106,7 +104,8 @@ public class GameVisualizer extends JPanel {
         return value;
     }
 
-    private void moveRobot(double velocity, double angularVelocity, double duration) {
+    // Сделали package-private для тестов
+    void moveRobot(double velocity, double angularVelocity, double duration) {
         velocity = applyLimits(velocity, 0, maxVelocity);
         angularVelocity = applyLimits(angularVelocity, -maxAngularVelocity, maxAngularVelocity);
 
@@ -123,7 +122,6 @@ public class GameVisualizer extends JPanel {
             newY = m_robotPositionY + velocity * duration * Math.sin(m_robotDirection);
         }
 
-        // Ограничение по границам панели (устранение "убегания")
         Rectangle bounds = getBounds();
         if (bounds.width > 0 && bounds.height > 0) {
             newX = applyLimits(newX, 0, bounds.width);
@@ -146,9 +144,10 @@ public class GameVisualizer extends JPanel {
         return (int) (value + 0.5);
     }
 
+    // Изменено на paintComponent
     @Override
-    public void paint(Graphics g) {
-        super.paint(g);
+    protected void paintComponent(Graphics g) {
+        super.paintComponent(g);
         Graphics2D g2d = (Graphics2D) g;
         drawRobot(g2d, round(m_robotPositionX), round(m_robotPositionY), m_robotDirection);
         drawTarget(g2d, m_targetPositionX, m_targetPositionY);
@@ -163,26 +162,35 @@ public class GameVisualizer extends JPanel {
     }
 
     private void drawRobot(Graphics2D g, int x, int y, double direction) {
-        int robotCenterX = round(m_robotPositionX);
-        int robotCenterY = round(m_robotPositionY);
-        AffineTransform t = AffineTransform.getRotateInstance(direction, robotCenterX, robotCenterY);
-        g.setTransform(t);
+        AffineTransform old = g.getTransform(); // СОХРАНЯЕМ СТАРОЕ СОСТОЯНИЕ
+        g.rotate(direction, x, y); // Крутим ТОЛЬКО локально
+        
         g.setColor(Color.MAGENTA);
-        fillOval(g, robotCenterX, robotCenterY, 30, 10);
+        fillOval(g, x, y, 30, 10);
         g.setColor(Color.BLACK);
-        drawOval(g, robotCenterX, robotCenterY, 30, 10);
+        drawOval(g, x, y, 30, 10);
         g.setColor(Color.WHITE);
-        fillOval(g, robotCenterX + 10, robotCenterY, 5, 5);
+        fillOval(g, x + 10, y, 5, 5);
         g.setColor(Color.BLACK);
-        drawOval(g, robotCenterX + 10, robotCenterY, 5, 5);
+        drawOval(g, x + 10, y, 5, 5);
+        
+        g.setTransform(old); // ВОЗВРАЩАЕМ
     }
 
     private void drawTarget(Graphics2D g, int x, int y) {
-        AffineTransform t = AffineTransform.getRotateInstance(0, 0, 0);
-        g.setTransform(t);
+        // Мишени не нужно вращение! Просто рисуем по координатам
         g.setColor(Color.GREEN);
         fillOval(g, x, y, 5, 5);
         g.setColor(Color.BLACK);
         drawOval(g, x, y, 5, 5);
+    }
+
+    // Геттеры и сеттеры для тестов
+    double getRobotPositionX() { return m_robotPositionX; }
+    double getRobotPositionY() { return m_robotPositionY; }
+    void setRobotPosition(double x, double y, double dir) {
+        m_robotPositionX = x;
+        m_robotPositionY = y;
+        m_robotDirection = dir;
     }
 }
